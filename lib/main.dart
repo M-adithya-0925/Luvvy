@@ -21,4 +21,4 @@ class DatingApp extends StatelessWidget {
       home: const SplashScreen(),
     );
   }
-}
+}  //hdjjd
