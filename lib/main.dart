@@ -12,13 +12,14 @@ class DatingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'LoveLink',
+      title: 'Datify',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        fontFamily: 'Urbanist',
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.pinkAccent),
+        colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFF9610FF)),
       ),
       home: const SplashScreen(),
     );
   }
-}  //hdjjd
+}

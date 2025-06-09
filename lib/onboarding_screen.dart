@@ -1,107 +1,13 @@
 import 'package:flutter/material.dart';
 import 'login_page.dart';
 
+const Color primaryColor = Color(0xFF9610FF);
+
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
-}
-class OnboardingPage extends StatelessWidget {
-  final String imagePath;
-  final String title;
-  final String subtitle;
-  final bool progressBar;
-  final bool confetti;
-  final VoidCallback onContinue;
-  final VoidCallback onSkip;
-
-  const OnboardingPage({
-    super.key,
-    required this.imagePath,
-    required this.title,
-    required this.subtitle,
-    required this.onContinue,
-    required this.onSkip,
-    this.progressBar = false,
-    this.confetti = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final media = MediaQuery.of(context).size;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          if (progressBar)
-            Align(
-              alignment: Alignment.topRight,
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple,
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: const Text("15%",
-                    style: TextStyle(color: Colors.white, fontSize: 12)),
-              ),
-            ),
-          const SizedBox(height: 30),
-          // Phone frame mockup
-          Container(
-            height: media.height * 0.45,
-            width: media.width * 0.8,
-            decoration: BoxDecoration(
-              border: Border.all(width: 8, color: Colors.black),
-              borderRadius: BorderRadius.circular(40),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(32),
-              child: Image.asset(imagePath, fit: BoxFit.cover),
-            ),
-          ),
-          const SizedBox(height: 30),
-          Text(title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              )),
-          const SizedBox(height: 16),
-          Text(subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.black54,
-              )),
-          const Spacer(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              TextButton(
-                  onPressed: onSkip,
-                  child: const Text("Skip",
-                      style: TextStyle(color: Colors.purple))),
-              ElevatedButton(
-                onPressed: onContinue,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 32, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30)),
-                ),
-                child: const Text("Continue"),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
@@ -111,42 +17,51 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<Map<String, dynamic>> pages = [
     {
       "imagePath": "assets/matches.png",
-      "title": "Discover Meaningful Connections",
-      "subtitle": "Join Datify today and explore a world of meaningful connections. Swipe, match, and meet like-minded people.",
+      "title": "Discover Meaningful\nConnections",
+      "subtitle":
+      "Join Datify today and explore a world of meaningful connections. Swipe, match, and meet like-minded people.",
     },
     {
       "imagePath": "assets/profile.png",
-      "title": "Be Yourself, Stand Out from the Crowd.",
-      "subtitle": "Tell your story. Share your interests, hobbies and what you're looking for. Be authentic and make a lasting impression.",
-      "progressBar": true,
+      "title": "Be Yourself,\nStand Out from the Crowd.",
+      "subtitle":
+      "Tell your story. Share your interests, hobbies, and what you're looking for. Be authentic and make a lasting impression.",
     },
     {
       "imagePath": "assets/match.png",
-      "title": "Find Your Perfect Match Today",
-      "subtitle": "Discover real connections with Datify’s intelligent matchmaking. Start swiping to find your perfect match today.",
-      "confetti": true,
+      "title": "Find Your\nPerfect Match Today",
+      "subtitle":
+      "Discover real connections with Datify's intelligent matchmaking. Start swiping to find your perfect match today.",
     }
   ];
 
   void _nextPage() {
     if (_currentPage < pages.length - 1) {
       _pageController.nextPage(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut);
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     } else {
       Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (_) => const LoginPage()));
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
     }
   }
 
   void _skip() {
     Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (_) => const LoginPage()));
+      context,
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context).size;
+
     return Scaffold(
+      backgroundColor: Colors.white,
       body: PageView.builder(
         controller: _pageController,
         itemCount: pages.length,
@@ -161,8 +76,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             imagePath: data["imagePath"],
             title: data["title"],
             subtitle: data["subtitle"],
-            progressBar: data["progressBar"] ?? false,
-            confetti: data["confetti"] ?? false,
+            currentPage: _currentPage,
             onContinue: _nextPage,
             onSkip: _skip,
           );
@@ -170,4 +84,192 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
     );
   }
+}
+
+class OnboardingPage extends StatelessWidget {
+  final String imagePath;
+  final String title;
+  final String subtitle;
+  final VoidCallback onContinue;
+  final VoidCallback onSkip;
+  final int currentPage;
+
+  const OnboardingPage({
+    super.key,
+    required this.imagePath,
+    required this.title,
+    required this.subtitle,
+    required this.onContinue,
+    required this.onSkip,
+    required this.currentPage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context).size;
+
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.white,
+      child: Stack(
+        children: [
+          ClipPath(
+            clipper: TopCurveClipper(),
+            child: Container(
+              height: media.height * 0.58,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [primaryColor, Color(0xFFB546E8)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: OverflowBox(
+                  maxHeight: 800,
+                  maxWidth: media.width,
+                  alignment: Alignment.topCenter,
+                  child: Transform.translate(
+                    offset: const Offset(0,40),
+                    child: Image.asset(
+                      imagePath,
+                      height: 800,
+                      width: 390,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 36),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'Urbanist',
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      height: 1.6,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    subtitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'Urbanist',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w400,
+                      height: 1.6,
+                      letterSpacing: 0.2,
+                      color: Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(3, (index) {
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: index == currentPage ? 16 : 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: index == currentPage
+                              ? primaryColor
+                              : Colors.grey[300],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: onSkip,
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: const Color(0xFFF5E6FA),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                            child: Text(
+                              "Skip",
+                              style: TextStyle(
+                                fontFamily: 'Urbanist',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                letterSpacing: 0.2,
+                                color: primaryColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: onContinue,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                            child: Text(
+                              "Continue",
+                              style: TextStyle(
+                                fontFamily: 'Urbanist',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                letterSpacing: 0.2,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TopCurveClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.lineTo(0, size.height * 0.82);
+    path.quadraticBezierTo(
+        size.width / 2, size.height, size.width, size.height * 0.82);
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }

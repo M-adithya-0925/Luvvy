@@ -20,19 +20,16 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    // Logo pop-in animation
     _logoController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     )..forward();
 
-    // Heart floating animation
     _heartController = AnimationController(
       duration: const Duration(seconds: 6),
       vsync: this,
     )..repeat();
 
-    // Navigation after splash
     Timer(const Duration(seconds: 4), () {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
@@ -52,7 +49,6 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  // Generate animated floating hearts
   List<Widget> buildAnimatedHearts() {
     return List.generate(20, (index) {
       final size = 20.0 + _random.nextInt(40);
@@ -84,43 +80,37 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF9B27B0), // Violet
+      backgroundColor: const Color(0xFF9610FF),
       body: Stack(
         children: [
-          // Animated floating hearts
           ...buildAnimatedHearts(),
-
-          // Center Logo and Title
           Center(
             child: ScaleTransition(
-              scale: Tween(begin: 0.6, end: 1.0)
-                  .animate(CurvedAnimation(parent: _logoController, curve: Curves.elasticOut)),
+              scale: Tween(begin: 0.6, end: 1.0).animate(
+                CurvedAnimation(parent: _logoController, curve: Curves.elasticOut),
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Logo icon
                   Container(
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
                     padding: const EdgeInsets.all(20),
-                    child: const Icon(Icons.chat_bubble,
-                        size: 80, color: Color(0xFF9B27B0)),
+                    child: const Icon(Icons.chat_bubble, size: 80, color: Color(0xFF9610FF)),
                   ),
                   const SizedBox(height: 20),
                   const Text(
                     "Luvvy",
                     style: TextStyle(
+                      fontFamily: 'Urbanist',
                       fontSize: 36,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
-                      fontFamily: 'Montserrat',
                     ),
                   ),
                   const SizedBox(height: 50),
-
-                  // Smooth loading indicator
                   TweenAnimationBuilder(
                     tween: Tween<double>(begin: 0, end: 1),
                     duration: const Duration(seconds: 2),
