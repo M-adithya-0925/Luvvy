@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'login.dart'; // Make sure this points to the file with LoginScreen class
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
 
+  // Fix: define buildSocialButton properly
   Widget buildSocialButton(String label, IconData icon, Color color) {
     return ElevatedButton.icon(
       onPressed: () {},
@@ -29,14 +31,19 @@ class LoginPage extends StatelessWidget {
           children: [
             const Icon(Icons.favorite, color: Colors.purple, size: 60),
             const SizedBox(height: 16),
-            const Text("Datify",
-                style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black)),
+            const Text(
+              "Datify",
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
             const SizedBox(height: 8),
-            const Text("Let’s dive into your account!",
-                style: TextStyle(fontSize: 16, color: Colors.black54)),
+            const Text(
+              "Let’s dive into your account!",
+              style: TextStyle(fontSize: 16, color: Colors.black54),
+            ),
 
             const SizedBox(height: 40),
             buildSocialButton("Continue with Google", Icons.g_mobiledata, Colors.red),
@@ -44,14 +51,19 @@ class LoginPage extends StatelessWidget {
             buildSocialButton("Continue with Apple", Icons.apple, Colors.black),
             const SizedBox(height: 10),
             buildSocialButton("Continue with Facebook", Icons.facebook, Colors.blue),
-            //const SizedBox(height: 10),
-            //buildSocialButton("Continue with Twitter", Icons.twitter, Colors.lightBlue),
 
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                // Navigate to actual login screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
@@ -71,7 +83,12 @@ class LoginPage extends StatelessWidget {
                 ],
               ),
             ),
-            const TextButton(onPressed: null, child: Text("Guest mode"))
+            TextButton(
+              onPressed: () {
+                // Guest mode logic here
+              },
+              child: const Text("Guest mode"),
+            )
           ],
         ),
       ),

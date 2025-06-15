@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:luvvy/login.dart';
 import 'login_page.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -88,13 +89,14 @@ class OnboardingPage extends StatelessWidget {
               ElevatedButton(
                 onPressed: onContinue,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
+                  backgroundColor: const Color.fromARGB(255, 98, 25, 223),
                   padding: const EdgeInsets.symmetric(
                       horizontal: 32, vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30)),
                 ),
-                child: const Text("Continue"),
+                child: const Text("Continue",
+                style:TextStyle(color: Colors.white),),
               ),
             ],
           ),
@@ -135,13 +137,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           curve: Curves.easeInOut);
     } else {
       Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (_) => const LoginPage()));
+          context, MaterialPageRoute(builder: (_) => const LoginScreen()));
     }
   }
 
   void _skip() {
     Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (_) => const LoginPage()));
+        context, MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   @override

@@ -1,0 +1,2 @@
+D:/android-app/Luvvy/android/app/.cxx/Debug/1q5a6n6y/armeabi-v7a/CMakeFiles/edit_cache.dir
+D:/android-app/Luvvy/android/app/.cxx/Debug/1q5a6n6y/armeabi-v7a/CMakeFiles/rebuild_cache.dir
