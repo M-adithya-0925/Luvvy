@@ -1,0 +1,2 @@
+C:/Users/Rahul/Documents/Zuntrapp/Luvvy/android/app/.cxx/Debug/86w5o621/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/Rahul/Documents/Zuntrapp/Luvvy/android/app/.cxx/Debug/86w5o621/x86_64/CMakeFiles/rebuild_cache.dir

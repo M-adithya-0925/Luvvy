@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart'; // Import your LoginScreen
+import 'package:firebase_auth/firebase_auth.dart';
+
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -19,7 +21,7 @@ class LoginPage extends StatelessWidget {
     );
   }
 
-  @override
+  @override 
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
