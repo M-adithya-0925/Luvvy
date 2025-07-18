@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart'; // ✅ Firebase Core
+import 'firebase_options.dart';                    // ✅ Import generated options
 import 'splash_screen.dart';
 import 'login_page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform, // ✅ Use config options
+  );
   runApp(const DatingApp());
 }
 
@@ -21,4 +27,4 @@ class DatingApp extends StatelessWidget {
       home: const SplashScreen(),
     );
   }
-}  //hdjjd
+}

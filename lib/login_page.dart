@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'login_screen.dart'; // Import your LoginScreen
+import 'package:firebase_auth/firebase_auth.dart';
+
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
 
-  Widget buildSocialButton(String label, IconData icon, Color color) {
+  Widget buildSocialButton(BuildContext context, String label, IconData icon, Color color, VoidCallback onPressed) {
     return ElevatedButton.icon(
-      onPressed: () {},
+      onPressed: onPressed,
       style: ElevatedButton.styleFrom(
         foregroundColor: Colors.black,
         backgroundColor: Colors.white,
@@ -39,13 +42,22 @@ class LoginPage extends StatelessWidget {
                 style: TextStyle(fontSize: 16, color: Colors.black54)),
 
             const SizedBox(height: 40),
-            buildSocialButton("Continue with Google", Icons.g_mobiledata, Colors.red),
+            buildSocialButton(
+              context,
+              "Continue with Google",
+              Icons.g_mobiledata,
+              Colors.red,
+                  () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                );
+              },
+            ),
             const SizedBox(height: 10),
-            buildSocialButton("Continue with Apple", Icons.apple, Colors.black),
+            buildSocialButton(context, "Continue with Apple", Icons.apple, Colors.black, () {}),
             const SizedBox(height: 10),
-            buildSocialButton("Continue with Facebook", Icons.facebook, Colors.blue),
-            //const SizedBox(height: 10),
-            //buildSocialButton("Continue with Twitter", Icons.twitter, Colors.lightBlue),
+            buildSocialButton(context, "Continue with Facebook", Icons.facebook, Colors.blue, () {}),
 
             const SizedBox(height: 20),
             ElevatedButton(
