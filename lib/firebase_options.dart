@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -30,17 +27,17 @@ class DefaultFirebaseOptions {
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
+              'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.windows:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
+              'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
+              'you can reconfigure this by running the FlutterFire CLI again.',
         );
       default:
         throw UnsupportedError(
@@ -50,20 +47,29 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBlKkzOB0H2gmhsJp5fn_M7B7lKqsFuPQY',
-    appId: '1:1059104618086:android:61b4fb1477496ff080dfa7',
-    messagingSenderId: '1059104618086',
-    projectId: 'luvvy-27cd2',
-    storageBucket: 'luvvy-27cd2.firebasestorage.app',
+    apiKey: 'AIzaSyCNN2slvgt_RQ6lQx8K_oANw1xWGaVN9LM',
+    appId: '1:561244051862:android:e8dd597b1c51155d8c65b7',
+    messagingSenderId: '561244051862',
+    projectId: 'date-7d307',
+    storageBucket: 'date-7d307.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCvJlEol-DRy0uyMTEsHOu2zf93uH8lCCs',
-    appId: '1:1059104618086:ios:f234e70c2b72bff580dfa7',
-    messagingSenderId: '1059104618086',
-    projectId: 'luvvy-27cd2',
-    storageBucket: 'luvvy-27cd2.firebasestorage.app',
+    apiKey: 'AIzaSyBAJRd45Ac7LfPBKc8HBzcKQKaN2yhp3o8',
+    appId: '1:561244051862:ios:22269754c776cc028c65b7',
+    messagingSenderId: '561244051862',
+    projectId: 'date-7d307',
+    storageBucket: 'date-7d307.firebasestorage.app',
     iosBundleId: 'com.example.luvvy',
+  );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyAgF5ISpCDKherCjpz5zAEQAlNzl8G5DJE',
+    appId: '1:561244051862:web:d2c9c1bc783907138c65b7',
+    messagingSenderId: '561244051862',
+    projectId: 'date-7d307',
+    authDomain: 'date-7d307.firebaseapp.com',
+    storageBucket: 'date-7d307.firebasestorage.app',
   );
 
 }

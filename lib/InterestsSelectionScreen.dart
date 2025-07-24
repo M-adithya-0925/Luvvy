@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'ChooseNicknameScreen.dart'; // ✅ Navigate to next screen after signup
+import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore import
+import 'login_screen.dart'; // Replace with your actual login screen import
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -26,27 +26,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
 
     try {
-      // 1. Firebase Auth
+      // 1. Firebase Authentication
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
-      // 2. Firestore: create user record
+      // 2. Firestore: Save user data
       String uid = userCredential.user!.uid;
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'email': email,
         'createdAt': DateTime.now(),
       });
 
+      // 3. Check if widget is still in the widget tree before using context
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Account created! Let's set up your profile.")),
+        const SnackBar(content: Text("Account created and data saved!")),
       );
 
-      // 3. Navigate to nickname screen
+      // 4. Navigate to login screen
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const ChooseNicknameScreen()),
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -150,7 +151,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   const Text("Already have an account? "),
                   GestureDetector(
                     onTap: () {
-                      Navigator.pop(context);
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      );
                     },
                     child: const Text(
                       "Sign in",

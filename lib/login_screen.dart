@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'reset_password_screen.dart';
 import 'sign_up_screen.dart';
+import 'ChooseNicknameScreen.dart';
 
 void main() {
   runApp(const MaterialApp(
@@ -46,7 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // For now, just show a success screen
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const SuccessScreen()),
+        MaterialPageRoute(builder: (context) => ChooseNicknameScreen()),
       );
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

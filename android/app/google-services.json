@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "1059104618086",
-    "project_id": "luvvy-27cd2",
-    "storage_bucket": "luvvy-27cd2.firebasestorage.app"
+    "project_number": "561244051862",
+    "project_id": "date-7d307",
+    "storage_bucket": "date-7d307.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1059104618086:android:61b4fb1477496ff080dfa7",
+        "mobilesdk_app_id": "1:561244051862:android:e8dd597b1c51155d8c65b7",
         "android_client_info": {
           "package_name": "com.example.luvvy"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBlKkzOB0H2gmhsJp5fn_M7B7lKqsFuPQY"
+          "current_key": "AIzaSyCNN2slvgt_RQ6lQx8K_oANw1xWGaVN9LM"
         }
       ],
       "services": {

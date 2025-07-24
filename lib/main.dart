@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart'; // ✅ Firebase Core
-import 'firebase_options.dart';                    // ✅ Import generated options
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';                   // ✅ Import generated options
 import 'splash_screen.dart';
 import 'login_page.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();  
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform, // ✅ Use config options
   );
