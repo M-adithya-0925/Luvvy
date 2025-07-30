@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart'; // Import your LoginScreen
 import 'package:firebase_auth/firebase_auth.dart';
+import 'sign_up_screen.dart'; // Import your SignUpScreen
 
 
 class LoginPage extends StatelessWidget {
@@ -72,16 +73,26 @@ class LoginPage extends StatelessWidget {
               child: const Text("Log in"),
             ),
             const SizedBox(height: 10),
-            const Text.rich(
-              TextSpan(
-                text: "Don't have an account? ",
-                children: [
-                  TextSpan(
-                    text: "Sign up",
-                    style: TextStyle(color: Colors.deepPurple),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text("Don't have an account? "),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SignUpScreen()),
+                    );
+                  },
+                  child: const Text(
+                    "Sign up",
+                    style: TextStyle(
+                      color: Colors.deepPurple,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
             const TextButton(onPressed: null, child: Text("Guest mode"))
           ],

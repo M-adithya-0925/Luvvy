@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'reset_password_screen.dart';
 import 'sign_up_screen.dart';
-import 'ChooseNicknameScreen.dart';
+import 'mainpage.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 void main() {
   runApp(const MaterialApp(
@@ -39,22 +41,49 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
       );
 
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      final userEmail = firebaseUser?.email;
+
+      if (userEmail == null) {
+        throw Exception("Could not get user email from Firebase.");
+      }
+
+      // 🔁 Call your Flask backend to get user ID
+      final response = await http.get(
+        Uri.parse('http://192.168.29.86:5000/users?email=$userEmail'),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception("Failed to retrieve user ID from backend.");
+      }
+
+      final userData = json.decode(response.body);
+      final userId = userData['user_id'];
+
+      if (userId == null) {
+        throw Exception("User ID not found in backend response.");
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Login successful!")),
       );
 
-      // TODO: Replace with your actual HomeScreen
-      // For now, just show a success screen
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => ChooseNicknameScreen()),
+        MaterialPageRoute(builder: (context) => MainPage(userId: userId)),
       );
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? "Login failed")),
       );
+    } catch (e) {
+      print("Error during login: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: ${e.toString()}")),
+      );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
