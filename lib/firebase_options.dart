@@ -47,29 +47,29 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCNN2slvgt_RQ6lQx8K_oANw1xWGaVN9LM',
-    appId: '1:561244051862:android:e8dd597b1c51155d8c65b7',
-    messagingSenderId: '561244051862',
-    projectId: 'date-7d307',
-    storageBucket: 'date-7d307.firebasestorage.app',
+    apiKey: 'AIzaSyDEyzdJ45QX51exTqmGIGAkS_QWL-aoMUg',
+    appId: '1:16790831811:android:4af20d33c14855dd2e1876',
+    messagingSenderId: '16790831811',
+    projectId: 'lovedate-c3e8b',
+    storageBucket: 'lovedate-c3e8b.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBAJRd45Ac7LfPBKc8HBzcKQKaN2yhp3o8',
-    appId: '1:561244051862:ios:22269754c776cc028c65b7',
-    messagingSenderId: '561244051862',
-    projectId: 'date-7d307',
-    storageBucket: 'date-7d307.firebasestorage.app',
+    apiKey: 'AIzaSyDD5XF_dAE-RGCtOIO4rxuj6LI7YmtuQso',
+    appId: '1:16790831811:ios:e4ba112c325434a02e1876',
+    messagingSenderId: '16790831811',
+    projectId: 'lovedate-c3e8b',
+    storageBucket: 'lovedate-c3e8b.firebasestorage.app',
     iosBundleId: 'com.example.luvvy',
   );
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAgF5ISpCDKherCjpz5zAEQAlNzl8G5DJE',
-    appId: '1:561244051862:web:d2c9c1bc783907138c65b7',
-    messagingSenderId: '561244051862',
-    projectId: 'date-7d307',
-    authDomain: 'date-7d307.firebaseapp.com',
-    storageBucket: 'date-7d307.firebasestorage.app',
+    apiKey: 'AIzaSyDVQZfMNPo-09n59EC1sxABWtOULqP2fhU',
+    appId: '1:16790831811:web:6c8c2071c2120c212e1876',
+    messagingSenderId: '16790831811',
+    projectId: 'lovedate-c3e8b',
+    authDomain: 'lovedate-c3e8b.firebaseapp.com',
+    storageBucket: 'lovedate-c3e8b.firebasestorage.app',
   );
 
 }
