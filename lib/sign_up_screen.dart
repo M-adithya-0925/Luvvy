@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'ChooseNicknameScreen.dart'; // ✅ Navigate to next screen after signup
+import 'ChooseNicknameScreen.dart'; // Make sure this import is correct
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -13,6 +13,7 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  bool _isLoading = false;
 
   Future<void> signUp() async {
     final email = emailController.text.trim();
@@ -25,36 +26,72 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
-      // 1. Firebase Auth
+      print("🔄 Starting signup process...");
+
+      // Firebase Auth
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
-      // 2. Firestore: create user record
       String uid = userCredential.user!.uid;
+      print("✅ Firebase Auth successful. UID: $uid");
+
+      // Save user in Firestore
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'email': email,
         'createdAt': DateTime.now(),
       });
 
-      if (!mounted) return;
+      print("✅ User created and stored in Firestore");
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Account created! Let's set up your profile.")),
-      );
+      if (!mounted) {
+        print("⚠️ Widget not mounted, returning");
+        return;
+      }
 
-      // 3. Navigate to nickname screen
-      Navigator.pushReplacement(
+      print("🔄 About to navigate...");
+
+      // Simple navigation - try this first
+      Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const ChooseNicknameScreen()),
+        MaterialPageRoute(
+          builder: (context) => const ChooseNicknameScreen(),
+        ),
       );
+
+      print("✅ Navigation executed");
+
     } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? "Signup failed")),
-      );
+      print("❌ FirebaseAuthException: ${e.code} - ${e.message}");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? "Signup failed")),
+        );
+      }
+    } catch (e) {
+      print("❌ General Error: $e");
+      print("❌ Error Type: ${e.runtimeType}");
+      print("❌ Stack trace: ${StackTrace.current}");
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +107,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 icon: const Icon(Icons.arrow_back, size: 28),
                 onPressed: () => Navigator.pop(context),
               ),
+
+
+
               const SizedBox(height: 10),
               const Text(
                 "Create an account 🧑‍💻",
@@ -86,6 +126,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               const SizedBox(height: 8),
               TextField(
                 controller: emailController,
+                keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.email_outlined),
                   hintText: 'Email',
@@ -169,16 +210,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: signUp,
+                  onPressed: _isLoading ? null : signUp,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.purple,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  child: const Text(
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
                     "Sign up",
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ),
               ),
