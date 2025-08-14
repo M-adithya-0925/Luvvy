@@ -6,13 +6,6 @@ import 'mainpage.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-void main() {
-  runApp(const MaterialApp(
-    home: LoginScreen(),
-    debugShowCheckedModeBanner: false,
-  ));
-}
-
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -36,6 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     try {
+      // 🔑 Sign in with Firebase
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -48,42 +42,42 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception("Could not get user email from Firebase.");
       }
 
-      // 🔁 Call your Flask backend to get user ID
-      final response = await http.get(
-        Uri.parse('http://192.168.29.86:5000/users?email=$userEmail'),
+      // 📡 Get recommendations from backend
+      final recResponse = await http.get(
+        Uri.parse('http://192.168.29.45:5000/recommend?email=$userEmail'),
       );
 
-      if (response.statusCode != 200) {
-        throw Exception("Failed to retrieve user ID from backend.");
+      if (recResponse.statusCode != 200) {
+        throw Exception("Failed to retrieve recommendations from backend.");
       }
 
-      final userData = json.decode(response.body);
-      final userId = userData['user_id'];
-
-      if (userId == null) {
-        throw Exception("User ID not found in backend response.");
-      }
+      final recommendations = json.decode(recResponse.body);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Login successful!")),
       );
 
+      // 📲 Go to MainPage with data
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => MainPage(userId: userId)),
+        MaterialPageRoute(
+          builder: (context) => MainPage(
+            userEmail: userEmail,
+            recommendations: recommendations,
+          ),
+        ),
       );
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? "Login failed")),
       );
     } catch (e) {
-      print("Error during login: $e");
+      print("❌ Error during login: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: ${e.toString()}")),
       );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -99,10 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 30),
               const Text(
                 'Welcome back 👋',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
               const Text(
@@ -218,22 +209,6 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 20),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class SuccessScreen extends StatelessWidget {
-  const SuccessScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Text(
-          "🎉 Logged In Successfully!",
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
       ),
     );

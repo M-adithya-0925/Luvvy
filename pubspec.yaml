@@ -41,6 +41,7 @@ dependencies:
   firebase_core: ^3.15.2
   firebase_auth: ^5.7.0
   cloud_firestore: ^5.6.12
+  swipable_stack: ^2.0.0
   http: ^0.13.6
 
 dev_dependencies:
