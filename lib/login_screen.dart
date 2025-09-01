@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // 📡 Get recommendations from backend
       final recResponse = await http.get(
-        Uri.parse('http://192.168.29.45:5000/recommend?email=$userEmail'),
+        Uri.parse('http://192.168.0.76:5000/recommend?email=$userEmail'),
       );
 
       if (recResponse.statusCode != 200) {

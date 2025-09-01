@@ -19,7 +19,7 @@ class _ProfileStoryScreenState extends State<ProfileStoryScreen> {
   bool _isLoading = false;
 
   Future<void> sendStoryToBackend(String story) async {
-    final uri = Uri.parse('http://192.168.29.45:5000/analyze');
+    final uri = Uri.parse('http://192.168.0.76:5000/analyze');
     setState(() => _isLoading = true);
 
     try {
