@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:swipable_stack/swipable_stack.dart';
 import 'services/socket_service.dart';
-
 import 'chat.dart';
-import 'InterestsPage.dart';
+import 'interestspage.dart';
 import 'terms_conditions.dart';
+import 'dart:math' as math;
 
 class MainPage extends StatefulWidget {
   final String userEmail;
@@ -20,67 +21,269 @@ class MainPage extends StatefulWidget {
   State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> {
+class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   final SocketService _socket = SocketService.instance;
   SwipableStackController _swipeController = SwipableStackController();
 
-  Set<String> likedUserEmails = {};
-  Set<String> matchedUserEmails = {};
+  Set<String> likedEmails = {};
+  Set<String> matchedEmails = {};
   List<Map<String, dynamic>> pendingLikes = [];
+  List<dynamic> filteredRecommendations = [];
+  bool _isLoadingInteractions = true;
+
+  // ✅ FIXED: Make animations nullable
+  AnimationController? _fadeController;
+  AnimationController? _buttonController;
+  Animation<double>? _fadeAnimation;
+  Animation<double>? _buttonAnimation;
 
   @override
   void initState() {
     super.initState();
+
+    // ✅ FIXED: Initialize animations immediately
+    _initializeAnimations();
     _socket.connect(widget.userEmail);
 
+    // Load existing interactions
+    _loadUserInteractions().then((_) {
+      _filterRecommendations();
+      _fadeController?.forward();
+      Future.delayed(const Duration(milliseconds: 400), () {
+        _buttonController?.forward();
+      });
+    });
+
+    // Socket listeners
     _socket.onLikeReceived = (data) {
-      setState(() => pendingLikes.add({'from': data['from']}));
-      _showLikeNotification(data['from']);
+      final fromUser = data['from'] as String;
+      if (!pendingLikes.any((e) => e['from'] == fromUser)) {
+        setState(() => pendingLikes.add({'from': fromUser}));
+      }
+      _showLikeReceivedDialog(fromUser);
     };
 
     _socket.onMatchCreated = (data) {
+      final matchedUser = data['with'] as String;
       setState(() {
-        matchedUserEmails.add(data['with']);
-        likedUserEmails.add(data['with']);
+        matchedEmails.add(matchedUser);
+        likedEmails.add(matchedUser);
       });
-      _showTermsAndConditions(data['with']);
+      _filterRecommendations();
+      _showTermsAndConditions(matchedUser);
     };
 
-    _socket.onError = (msg) => _showError(msg);
+    _socket.onError = (msg) {
+      _showErrorSnackBar(msg);
+    };
   }
 
-  List<dynamic> get filteredRecommendations =>
-      widget.recommendations.where((user) =>
-      !likedUserEmails.contains(user['email']) &&
-          !matchedUserEmails.contains(user['email'])).toList();
+  // ✅ FIXED: Separate animation initialization
+  void _initializeAnimations() {
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _buttonController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
 
-  void _showLikeNotification(String from) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("💖 New Like!"),
-        content: Text('$from liked you!'),
-        actions: [
-          TextButton(
-            child: const Text('Pass'),
-            onPressed: () {
-              _socket.rejectLike(from);
-              Navigator.pop(context);
-            },
-          ),
-          ElevatedButton(
-            child: const Text('Like Back'),
-            onPressed: () {
-              _socket.acceptLike(from);
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      ),
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController!, curve: Curves.easeInOut),
+    );
+    _buttonAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _buttonController!, curve: Curves.elasticOut),
     );
   }
 
-  void _showTermsAndConditions(String withUser) {
+  Future<void> _loadUserInteractions() async {
+    final user = widget.userEmail;
+    try {
+      final likesSnapshot = await FirebaseFirestore.instance
+          .collection('likes')
+          .where('from', isEqualTo: user)
+          .get();
+
+      final matchesSnapshot = await FirebaseFirestore.instance
+          .collection('matches')
+          .where('users', arrayContains: user)
+          .get();
+
+      setState(() {
+        likedEmails = likesSnapshot.docs.map((doc) {
+          final data = doc.data();
+          return data['to'] as String? ?? '';
+        }).where((email) => email != '').toSet();
+
+        matchedEmails = matchesSnapshot.docs.expand((doc) {
+          final users = List<String>.from(doc.data()['users'] ?? []);
+          return users.where((e) => e != user);
+        }).toSet();
+
+        _isLoadingInteractions = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingInteractions = false;
+      });
+      debugPrint("Error loading interactions: $e");
+    }
+  }
+
+  void _filterRecommendations() {
+    setState(() {
+      filteredRecommendations = widget.recommendations.where((user) {
+        final email = (user['email'] ?? "").toString().toLowerCase();
+        return email.isNotEmpty &&
+            !likedEmails.contains(email) &&
+            !matchedEmails.contains(email) &&
+            email != widget.userEmail.toLowerCase();
+      }).toList();
+    });
+  }
+
+  void _showLikeReceivedDialog(String from) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          margin: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 30,
+                offset: const Offset(0, 15),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+            // Animated heart
+            TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 1200),
+            tween: Tween(begin: 0.0, end: 1.0),
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: value,
+                child: Container(
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.pink.shade400, Colors.red.shade500],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.pink.withOpacity(0.4),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.favorite, size: 45, color: Colors.white),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 28),
+          const Text(
+            "💖 Someone likes you!",
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '$from thinks youre amazing! Like them back to create a match.',
+            style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey.shade600,
+            height: 1.5,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 36),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () {
+                  _socket.rejectLike(from);
+                  Navigator.pop(context);
+                  setState(() {
+                    pendingLikes.removeWhere((element) => element['from'] == from);
+                  });
+                },
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.grey.shade400, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                ),
+                child: Text(
+                  'Not Now',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () {
+                  _socket.acceptLike(from);
+                  Navigator.pop(context);
+                  setState(() {
+                    pendingLikes.removeWhere((element) => element['from'] == from);
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pink.shade400,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  elevation: 3,
+                ),
+                child: const Text(
+                  'Like Back ❤️',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        ],
+      ),
+    ),
+    ),
+    ),
+    );
+  }
+
+  void _showTermsAndConditions(String matchedUser) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -88,10 +291,10 @@ class _MainPageState extends State<MainPage> {
           onAccept: () => Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-                builder: (_) => ChatPage(
-                    userEmail: widget.userEmail,
-                    otherUserEmail: withUser
-                )
+              builder: (_) => ChatPage(
+                userEmail: widget.userEmail,
+                otherUserEmail: matchedUser,
+              ),
             ),
           ),
         ),
@@ -99,70 +302,626 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  void _showError(String msg) {
+  void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg),
-        backgroundColor: Colors.red,
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.all(16),
       ),
+    );
+  }
+
+  Widget _buildProfileCard(Map<String, dynamic> profile, int index) {
+    final name = profile['nickname'] ?? profile['name'] ?? 'Someone Special';
+    final age = profile['age']?.toString() ?? '';
+    final about = profile['about'] ?? profile['bio'] ?? profile['description'] ?? '';
+    final imageUrl = profile['profileImage'] ?? profile['imageUrl'] ?? '';
+    final location = profile['location'] ?? profile['city'] ?? '';
+    final matchScore = profile['match_score'] ?? profile['compatibility'] ?? '95';
+    final interests = (profile['interests'] as List?)?.take(3).toList() ?? [];
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 25,
+            offset: const Offset(0, 15),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Stack(
+          children: [
+            // Background Image
+            Container(
+              width: double.infinity,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: NetworkImage(
+                    imageUrl.isNotEmpty
+                        ? imageUrl
+                        : 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=600&fit=crop',
+                  ),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+
+            // Gradient Overlay
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.1),
+                    Colors.black.withOpacity(0.8),
+                  ],
+                  stops: const [0.0, 0.3, 0.7, 1.0],
+                ),
+              ),
+            ),
+
+            // Match Score Badge
+            Positioned(
+              top: 24,
+              right: 24,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.pink.shade400, Colors.purple.shade500],
+                  ),
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.pink.withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.favorite, color: Colors.white, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$matchScore%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Online Status
+            Positioned(
+              top: 24,
+              left: 24,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade500,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.circle, color: Colors.white, size: 10),
+                    SizedBox(width: 6),
+                    Text(
+                      "Online",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Profile Information
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Name and Age
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black26,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (age.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              age,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Location
+                    if (location.isNotEmpty)
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on, color: Colors.white70, size: 20),
+                          const SizedBox(width: 6),
+                          Text(
+                            location,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Bio
+                    if (about.isNotEmpty)
+                      Text(
+                        about,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          height: 1.4,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black26,
+                              blurRadius: 4,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                    const SizedBox(height: 20),
+
+                    // Interests
+                    if (interests.isNotEmpty)
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: interests.map((interest) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.4),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              interest.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required Color color,
+    required Color backgroundColor,
+    required String label,
+    required VoidCallback onPressed,
+    double size = 68,
+  }) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: onPressed,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: color, size: size * 0.45),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Luvvy'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.group),
-            onPressed: (){
-              Navigator.push(context,MaterialPageRoute(
-                  builder: (_) => InterestsPage(userEmail: widget.userEmail))
-              );
-            },
-          ),
-        ],
-      ),
-      body: filteredRecommendations.isEmpty
-          ? Center(child: Text("No more recommendations"))
-          : SwipableStack(
-        controller: _swipeController,
-        itemCount: filteredRecommendations.length,
-        builder: (context, properties) {
-          final profile = filteredRecommendations[properties.index];
-          return Card(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 64,
-                  backgroundImage: NetworkImage(profile['profileImage'] ?? 'https://via.placeholder.com/150'),
+    if (_isLoadingInteractions) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation(Colors.pink),
+                strokeWidth: 3,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                "Finding amazing people for you...",
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
                 ),
-                Text(profile['nickname'] ?? 'Someone', style: TextStyle(fontSize: 20)),
-                Text(profile['about'] ?? '', textAlign: TextAlign.center),
-              ],
-            ),
-          );
-        },
-        onSwipeCompleted: (index, direction) {
-          final user = filteredRecommendations[index];
-          final email = user['email'];
-          if (direction == SwipeDirection.right && email != null) {
-            likedUserEmails.add(email);
-            _socket.likeUser(email);
-            setState(() {});
-          }
-        },
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (filteredRecommendations.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.search_off,
+                size: 80,
+                color: Colors.grey.shade400,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                "No more profiles to show",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                "Check back later for new matches!",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: SafeArea(
+        child: _fadeAnimation == null
+            ? const Center(child: CircularProgressIndicator()) // ✅ FIXED: Show loading while animations initialize
+            : FadeTransition(
+          opacity: _fadeAnimation!,
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.pink.shade400, Colors.purple.shade500],
+                        ),
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.pink.withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Text(
+                        'Luvvy',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            icon: Stack(
+                              children: [
+                                const Icon(Icons.favorite, color: Colors.pink),
+                                if (pendingLikes.isNotEmpty)
+                                  Positioned(
+                                    right: 0,
+                                    top: 0,
+                                    child: Container(
+                                      width: 16,
+                                      height: 16,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          pendingLikes.length.toString(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => InterestsPage(userEmail: widget.userEmail),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            icon: const Icon(Icons.chat_bubble, color: Colors.purple),
+                            onPressed: () {},
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Progress indicator
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: [
+                    Text(
+                      "${filteredRecommendations.length} profiles",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: 1.0,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.pink.shade400, Colors.purple.shade500],
+                              ),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Cards
+              Expanded(
+                child: SwipableStack(
+                  controller: _swipeController,
+                  itemCount: filteredRecommendations.length,
+                  builder: (context, properties) {
+                    final profile = filteredRecommendations[properties.index];
+                    return _buildProfileCard(profile, properties.index);
+                  },
+                  onSwipeCompleted: (index, direction) {
+                    final user = filteredRecommendations[index];
+                    final email = (user['email'] ?? '').toString().toLowerCase();
+                    if (direction == SwipeDirection.right && email.isNotEmpty) {
+                      likedEmails.add(email);
+                      _socket.likeUser(email);
+                      _filterRecommendations();
+                    }
+                  },
+                ),
+              ),
+
+              // Action Buttons
+              _buttonAnimation == null
+                  ? Container() // ✅ FIXED: Show empty container while button animation initializes
+                  : AnimatedBuilder(
+                animation: _buttonAnimation!,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _buttonAnimation!.value,
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildActionButton(
+                            icon: Icons.close,
+                            color: Colors.red.shade500,
+                            backgroundColor: Colors.white,
+                            label: "Nope",
+                            onPressed: () {
+                              _swipeController.next(swipeDirection: SwipeDirection.left);
+                            },
+                          ),
+                          _buildActionButton(
+                            icon: Icons.star,
+                            color: Colors.blue.shade500,
+                            backgroundColor: Colors.white,
+                            label: "Super",
+                            size: 78,
+                            onPressed: () {
+                              _swipeController.next(swipeDirection: SwipeDirection.up);
+                            },
+                          ),
+                          _buildActionButton(
+                            icon: Icons.favorite,
+                            color: Colors.pink.shade500,
+                            backgroundColor: Colors.white,
+                            label: "Like",
+                            onPressed: () {
+                              _swipeController.next(swipeDirection: SwipeDirection.right);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
       ),
-      floatingActionButton: pendingLikes.isNotEmpty
-          ? FloatingActionButton(
-        backgroundColor: Colors.purple,
-        onPressed: () => _showLikeNotification(pendingLikes.last['from']),
-        child: Icon(Icons.favorite),
-      )
-          : null,
     );
+  }
+
+  @override
+  void dispose() {
+    _fadeController?.dispose();
+    _buttonController?.dispose();
+    super.dispose();
   }
 }
