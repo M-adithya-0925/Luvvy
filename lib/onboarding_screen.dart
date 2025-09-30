@@ -86,6 +86,7 @@ class OnboardingPage extends StatelessWidget {
                   child: const Text("Skip",
                       style: TextStyle(color: Colors.purple))),
               ElevatedButton(
+
                 onPressed: onContinue,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepPurple,

@@ -5,347 +5,402 @@ import 'services/FirebaseService.dart';
 class InterestsSelectionScreen extends StatefulWidget {
   final Map<String, dynamic>? preferences;
 
-  InterestsSelectionScreen({this.preferences});
+  const InterestsSelectionScreen({super.key, this.preferences});
 
   @override
-  _InterestsSelectionScreenState createState() =>
-      _InterestsSelectionScreenState();
+  _InterestsSelectionScreenState createState() => _InterestsSelectionScreenState();
 }
 
 class _InterestsSelectionScreenState extends State<InterestsSelectionScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<String> selectedInterests = [];
+  String selectedCategory = 'All';
+  bool _isLoading = false;
 
-  final List<Interest> interests = [
-    // Interests
-    Interest('Yoga', '🧘'),
-    Interest('Cooking', '🍳'),
-    Interest('Hiking', '🥾'),
-    Interest('Photography', '📷'),
-    Interest('Astrology', '🔮'),
-    Interest('Spirituality', '🕉️'),
-    Interest('Dancing', '💃'),
-    Interest('Reading', '📚'),
-    Interest('Surfing', '🏄‍♂️'),
-    Interest('Minimalism', '🌱'),
-    Interest('Fashion', '👗'),
-    Interest('Nature', '🌿'),
-    Interest('Writing', '✍️'),
-    Interest('Volunteering', '🤝'),
-    Interest('Gardening', '🌼'),
-    Interest('Camping', '🏕️'),
-    Interest('Skating', '🛼'),
-    Interest('Binge-Watching', '📺'),
-    Interest('Travel', '✈️'),
-    Interest('Meditation', '🧘‍♂️'),
-    Interest('Fitness', '💪'),
-    Interest('Blogging', '📝'),
-    Interest('Workout', '🏋️'),
-    Interest('Board Games', '🎲'),
-    Interest('Entrepreneurship', '🚀'),
-    Interest('Journaling', '📓'),
+  final int maxSelections = 8;
 
-    // Languages
-    Interest('English', '🇬🇧'),
-    Interest('Hindi', '🇮🇳'),
-    Interest('Tamil', '🇮🇳'),
-    Interest('Telugu', '🇮🇳'),
-    Interest('Malayalam', '🇮🇳'),
-    Interest('Kannada', '🇮🇳'),
-    Interest('Marathi', '🇮🇳'),
-    Interest('French', '🇫🇷'),
-    Interest('German', '🇩🇪'),
-    Interest('Spanish', '🇪🇸'),
-    Interest('Korean', '🇰🇷'),
-    Interest('Japanese', '🇯🇵'),
+  // Simplified interests
+  final Map<String, List<Interest>> categorizedInterests = {
+    'Lifestyle': [
+      Interest('Yoga', '🧘‍♀️'), Interest('Fitness', '💪'), Interest('Running', '🏃‍♀️'),
+      Interest('Cycling', '🚴‍♂️'), Interest('Swimming', '🏊‍♀️'), Interest('Gym', '🏋️‍♂️'),
+    ],
 
-    // Relationship Goals
-    Interest('Dating', '💑'),
-    Interest('Friendship', '👫'),
-    Interest('Casual', '😎'),
-    Interest('Serious Relationship', '❤️'),
-    Interest('Exploration', '🌍'),
+    'Food': [
+      Interest('Cooking', '👩‍🍳'), Interest('Coffee', '☕'), Interest('Wine', '🍷'),
+      Interest('Vegan', '🌱'), Interest('Foodie', '🍽️'), Interest('Baking', '🍰'),
+    ],
 
-    // Religion
-    Interest('Hinduism', '🛕'),
-    Interest('Islam', '🕌'),
-    Interest('Christianity', '⛪'),
-    Interest('Buddhism', '☸️'),
-    Interest('Atheist', '❌'),
-    Interest('Spiritual', '✨'),
+    'Adventure': [
+      Interest('Hiking', '🥾'), Interest('Surfing', '🏄‍♂️'), Interest('Skiing', '⛷️'),
+      Interest('Camping', '🏕️'), Interest('Rock Climbing', '🧗‍♂️'), Interest('Backpacking', '🎒'),
+    ],
 
-    // Music
-    Interest('Rock', '🎸'),
-    Interest('Indie', '🎶'),
-    Interest('Pop', '🎤'),
-    Interest('Jazz', '🎷'),
-    Interest('Classical', '🎻'),
-    Interest('Hip-Hop', '🎧'),
-    Interest('K-pop', '🎵'),
+    'Arts': [
+      Interest('Photography', '📸'), Interest('Art', '🎨'), Interest('Music', '🎵'),
+      Interest('Dancing', '💃'), Interest('Theater', '🎭'), Interest('Writing', '✍️'),
+    ],
 
-    // Movies
-    Interest('Action', '🔫'),
-    Interest('Romantic', '💕'),
-    Interest('Thriller', '😱'),
-    Interest('Comedy', '😂'),
-    Interest('Historical', '🏛️'),
-    Interest('Sci-fi', '🛸'),
-    Interest('Fantasy', '🧙'),
+    'Entertainment': [
+      Interest('Movies', '🎬'), Interest('Gaming', '🎮'), Interest('Reading', '📚'),
+      Interest('Netflix', '📺'), Interest('Podcasts', '🎙️'), Interest('Comedy', '😂'),
+    ],
 
-    // Books
-    Interest('Romance', '💌'),
-    Interest('Mystery', '🕵️'),
-    Interest('Fantasy', '🐉'),
-    Interest('Biography', '📖'),
-    Interest('Science Fiction', '🚀'),
-    Interest('Spirituality', '📿'),
-    Interest('Motivational', '📈'),
+    'Travel': [
+      Interest('Travel', '✈️'), Interest('Beach', '🏖️'), Interest('Mountains', '🏔️'),
+      Interest('Road Trips', '🚗'), Interest('Solo Travel', '🚶‍♀️'), Interest('City Breaks', '🏙️'),
+    ],
 
-    // Travel
-    Interest('Solo Travel', '🚶‍♀️'),
-    Interest('Road Trips', '🚗'),
-    Interest('Beach Travel', '🏖️'),
-    Interest('Cultural Exploration', '🎭'),
-    Interest('Trekking', '⛰️'),
+    'Social': [
+      Interest('Volunteering', '🤝'), Interest('Parties', '🥳'), Interest('Meetups', '👫'),
+      Interest('Networking', '👥'), Interest('Dancing', '💃'), Interest('Social Events', '🎉'),
+    ],
+  };
 
-    // Diet
-    Interest('Vegan', '🥗'),
-    Interest('Vegetarian', '🌱'),
-    Interest('Keto', '🥩'),
-    Interest('Organic', '🌾'),
-    Interest('Ayurvedic', '🌿'),
-
-    // Lifestyle
-    Interest('Pets', '🐶'),
-    Interest('Drinking Habits', '🍷'),
-    Interest('Smoking Habits', '🚭'),
-    Interest('Social Media Presence', '📱'),
-  ];
-
-
+  List<String> get categories => ['All'] + categorizedInterests.keys.toList();
 
   List<Interest> get filteredInterests {
+    List<Interest> interests = [];
+
+    if (selectedCategory == 'All') {
+      interests = categorizedInterests.values.expand((list) => list).toList();
+    } else {
+      interests = categorizedInterests[selectedCategory] ?? [];
+    }
+
     if (_searchController.text.isEmpty) return interests;
-    return interests
-        .where((interest) => interest.name
-        .toLowerCase()
-        .contains(_searchController.text.toLowerCase()))
-        .toList();
+
+    return interests.where((interest) =>
+        interest.name.toLowerCase().contains(_searchController.text.toLowerCase())
+    ).toList();
   }
 
   @override
   void initState() {
     super.initState();
     if (widget.preferences != null) {
-      autoSelectPreferences(widget.preferences!);
+      _autoSelectPreferences(widget.preferences!);
     }
   }
 
-  void autoSelectPreferences(Map<String, dynamic> preferences) {
-    final allValues = preferences.values.expand((e) => e).toList();
-    final names = interests.map((i) => i.name.toLowerCase()).toSet();
+  void _autoSelectPreferences(Map<String, dynamic> preferences) {
+    print("🤖 AI suggested preferences: $preferences");
 
-    for (var item in allValues) {
-      if (item is String && names.contains(item.toLowerCase())) {
-        final match = interests.firstWhere(
-              (i) => i.name.toLowerCase() == item.toLowerCase(),
-          orElse: () => Interest('', ''),
-        );
-        if (match.name.isNotEmpty && !selectedInterests.contains(match.name)) {
-          selectedInterests.add(match.name);
+    for (final category in preferences.keys) {
+      final items = preferences[category];
+      if (items is List) {
+        for (final item in items) {
+          if (item is String) {
+            final itemLower = item.toLowerCase().trim();
+
+            // Direct and partial matches
+            for (final interest in categorizedInterests.values.expand((list) => list)) {
+              if ((interest.name.toLowerCase() == itemLower ||
+                  interest.name.toLowerCase().contains(itemLower)) &&
+                  !selectedInterests.contains(interest.name) &&
+                  selectedInterests.length < maxSelections) {
+                selectedInterests.add(interest.name);
+                break;
+              }
+            }
+          }
         }
       }
     }
 
+    print("✅ Auto-selected ${selectedInterests.length} interests: $selectedInterests");
     setState(() {});
   }
 
-  void toggleInterest(String interestName) {
+  void _toggleInterest(String interestName) {
     setState(() {
       if (selectedInterests.contains(interestName)) {
         selectedInterests.remove(interestName);
-      } else if (selectedInterests.length < 5) {
+      } else if (selectedInterests.length < maxSelections) {
         selectedInterests.add(interestName);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Maximum $maxSelections interests allowed"),
+            backgroundColor: Colors.orange,
+          ),
+        );
       }
     });
+  }
+
+  Future<void> _continueToNext() async {
+    setState(() => _isLoading = true);
+
+    try {
+      await FirebaseService().updateUserInterests(selectedInterests);
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => PhotoUploadScreen()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  // Back button and progress
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+                        onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
+                      ),
+                      Expanded(
+                        child: Container(
+                          height: 8,
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(4),
+                            color: Colors.grey[200],
+                          ),
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: 0.98,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(4),
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF8B5CF6), Color(0xFFA855F7)],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Title
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Your interests',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                      if (selectedInterests.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Text(
+                            '${selectedInterests.length}/$maxSelections',
+                            style: TextStyle(
+                              color: Colors.green.shade700,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Text(
+                    'Select up to $maxSelections interests. We\'ve pre-selected some based on your story!',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Search bar
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: "Search interests...",
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onChanged: (value) => setState(() {}),
+                  ),
+                ],
+              ),
+            ),
+
+            // Category tabs
+            Container(
+              color: Colors.white,
+              child: SizedBox(
+                height: 50,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    final isSelected = category == selectedCategory;
+
+                    return Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text(category),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            selectedCategory = category;
+                          });
+                        },
+                        backgroundColor: Colors.white,
+                        selectedColor: const Color(0xFF8B5CF6),
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : Colors.grey.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // Interests list
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 3.5,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: filteredInterests.length,
+                  itemBuilder: (context, index) {
+                    final interest = filteredInterests[index];
+                    final isSelected = selectedInterests.contains(interest.name);
+
+                    return InkWell(
+                      onTap: () => _toggleInterest(interest.name),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFF8B5CF6) : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFF8B5CF6) : Colors.grey.shade300,
+                          ),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            Text(interest.emoji, style: const TextStyle(fontSize: 18)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                interest.name,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ),
+                            if (isSelected)
+                              const Icon(Icons.check, color: Colors.white, size: 18),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // Continue button
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(24),
+              child: SafeArea(
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: selectedInterests.length >= 3 && !_isLoading
+                        ? _continueToNext
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B5CF6),
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                        : Text(
+                      selectedInterests.length >= 3
+                          ? "Continue (${selectedInterests.length} selected)"
+                          : "Select at least 3 interests",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: BouncingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height -
-                    MediaQuery.of(context).padding.top,
-              ),
-              child: IntrinsicHeight(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 20),
-                    Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: Padding(
-                            padding: EdgeInsets.all(8),
-                            child: Icon(Icons.arrow_back_ios,
-                                color: Colors.black, size: 20),
-                          ),
-                        ),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: Container(
-                            height: 8,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(4),
-                              color: Colors.grey[200],
-                            ),
-                            child: FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: 0.9,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(4),
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xFF8B5CF6),
-                                      Color(0xFFA855F7)
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 40),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Discover like-minded people',
-                            style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black),
-                          ),
-                        ),
-                        Text('🤗', style: TextStyle(fontSize: 28)),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      'Share your interests, passions, and hobbies. We\'ll connect you with people who share your enthusiasm.',
-                      style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[600],
-                          height: 1.5),
-                    ),
-                    SizedBox(height: 30),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: filteredInterests.map((interest) {
-                        bool isSelected =
-                        selectedInterests.contains(interest.name);
-                        return GestureDetector(
-                          onTap: () => toggleInterest(interest.name),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? Color(0xFF8B5CF6)
-                                  : Colors.white,
-                              border: Border.all(
-                                color: isSelected
-                                    ? Color(0xFF8B5CF6)
-                                    : Colors.grey[300]!,
-                                width: 1.5,
-                              ),
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  interest.name,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : Colors.black,
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Text(interest.emoji,
-                                    style: TextStyle(fontSize: 16)),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    SizedBox(height: 30),
-                    Container(
-                      width: double.infinity,
-                      height: 56,
-                      margin: EdgeInsets.only(bottom: 40),
-                      child: ElevatedButton(
-                        onPressed: selectedInterests.isNotEmpty
-                            ? () async {
-                          print('Selected interests: $selectedInterests');
-                          await FirebaseService()
-                              .updateUserInterests(selectedInterests);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => PhotoUploadScreen()),
-                          );
-                        }
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF8B5CF6),
-                          disabledBackgroundColor: Colors.grey[300],
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(28)),
-                        ),
-                        child: Text(
-                          'Continue (${selectedInterests.length}/5)',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: selectedInterests.isNotEmpty
-                                ? Colors.white
-                                : Colors.grey[500],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 

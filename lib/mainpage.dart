@@ -1,257 +1,168 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:luvvy/InterestsPage.dart';
-import 'package:luvvy/ProfilePage.dart';
-import 'package:luvvy/SettingsPage.dart';
 import 'package:swipable_stack/swipable_stack.dart';
-import 'package:luvvy/chat.dart';
+import 'services/socket_service.dart';
+
+import 'chat.dart';
+import 'InterestsPage.dart';
+import 'terms_conditions.dart';
+
 class MainPage extends StatefulWidget {
   final String userEmail;
   final List<dynamic> recommendations;
 
   const MainPage({
-    super.key,
+    Key? key,
     required this.userEmail,
     required this.recommendations,
-  });
+  }) : super(key: key);
 
   @override
   State<MainPage> createState() => _MainPageState();
 }
 
 class _MainPageState extends State<MainPage> {
-  int _currentIndex = 0;
+  final SocketService _socket = SocketService.instance;
+  SwipableStackController _swipeController = SwipableStackController();
 
-  /// Helper to get value from multiple possible keys
-  String getValue(Map<String, dynamic> data, List<String> keys) {
-    for (var key in keys) {
-      if (data.containsKey(key) &&
-          data[key] != null &&
-          data[key].toString().isNotEmpty) {
-        return data[key].toString();
-      }
-    }
-    return "";
+  Set<String> likedUserEmails = {};
+  Set<String> matchedUserEmails = {};
+  List<Map<String, dynamic>> pendingLikes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _socket.connect(widget.userEmail);
+
+    _socket.onLikeReceived = (data) {
+      setState(() => pendingLikes.add({'from': data['from']}));
+      _showLikeNotification(data['from']);
+    };
+
+    _socket.onMatchCreated = (data) {
+      setState(() {
+        matchedUserEmails.add(data['with']);
+        likedUserEmails.add(data['with']);
+      });
+      _showTermsAndConditions(data['with']);
+    };
+
+    _socket.onError = (msg) => _showError(msg);
   }
 
-  /// Save liked user to the existing Firestore document
-  Future<void> _saveLikedUser(Map<String, dynamic> likedUser) async {
-    try {
-      // Find the user's document by email
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('email', isEqualTo: widget.userEmail)
-          .limit(1)
-          .get();
+  List<dynamic> get filteredRecommendations =>
+      widget.recommendations.where((user) =>
+      !likedUserEmails.contains(user['email']) &&
+          !matchedUserEmails.contains(user['email'])).toList();
 
-      if (querySnapshot.docs.isNotEmpty) {
-        final docRef = querySnapshot.docs.first.reference;
-
-        await docRef.update({
-          'liked': FieldValue.arrayUnion([likedUser]),
-        });
-
-        debugPrint("Liked user saved successfully to existing document!");
-      } else {
-        debugPrint("No document found for email ${widget.userEmail}");
-      }
-    } catch (e) {
-      debugPrint("Error saving liked user: $e");
-    }
+  void _showLikeNotification(String from) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("💖 New Like!"),
+        content: Text('$from liked you!'),
+        actions: [
+          TextButton(
+            child: const Text('Pass'),
+            onPressed: () {
+              _socket.rejectLike(from);
+              Navigator.pop(context);
+            },
+          ),
+          ElevatedButton(
+            child: const Text('Like Back'),
+            onPressed: () {
+              _socket.acceptLike(from);
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
   }
 
-  Widget buildSwipeCards() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final cardWidth = screenWidth < 380
-        ? screenWidth * 0.95
-        : screenWidth < 500
-        ? screenWidth * 0.9
-        : 420.0;
-
-    if (widget.recommendations.isEmpty) {
-      return const Center(
-        child: Text(
-          "No matches found 😔",
-          style: TextStyle(fontSize: 18, color: Colors.grey),
+  void _showTermsAndConditions(String withUser) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TermsConditionsScreen(
+          onAccept: () => Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (_) => ChatPage(
+                    userEmail: widget.userEmail,
+                    otherUserEmail: withUser
+                )
+            ),
+          ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    return Center(
-      child: SizedBox(
-        width: cardWidth,
-        child: SwipableStack(
-          itemCount: widget.recommendations.length,
-          builder: (context, properties) {
-            final match = Map<String, dynamic>.from(
-                widget.recommendations[properties.index]);
-
-            final name =
-            getValue(match, ['nickname', 'full_name', 'username']);
-            final imageUrl =
-            getValue(match, ['profileImage', 'image_url', 'avatar']);
-            final bio =
-            getValue(match, ['story', 'about', 'description']);
-            final score =
-            getValue(match, ['match_score', 'score', 'percentage']);
-
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.purple.withOpacity(0.25),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-                gradient: const LinearGradient(
-                  colors: [Colors.white, Color(0xFFF8F1FF)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: Padding(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 65,
-                      backgroundImage: NetworkImage(
-                        imageUrl.isNotEmpty
-                            ? imageUrl
-                            : 'https://via.placeholder.com/150',
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      name.isNotEmpty ? name : "Unknown",
-                      style: const TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.purple,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      child: Text(
-                        bio.isNotEmpty ? bio : "No bio available",
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.black87,
-                          fontSize: 14,
-                          height: 1.4,
-                        ),
-                        maxLines: 6,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        score.isNotEmpty
-                            ? "💜 Match Score: $score%"
-                            : "💜 Match Score: 0%",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.purple,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-          onSwipeCompleted: (index, direction) async {
-            debugPrint(
-                "Swiped $direction on ${widget.recommendations[index]}");
-
-            if (direction == SwipeDirection.right) {
-              await _saveLikedUser(
-                Map<String, dynamic>.from(widget.recommendations[index]),
-              );
-            }
-          },
-        ),
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.red,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> pages = [
-      buildSwipeCards(),
-      InterestsPage(userId: widget.userEmail),
-      ProfilePage(userId: widget.userEmail),
-      SettingsPage(),
-    ];
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Welcome, ${widget.userEmail}',
-          style: const TextStyle(fontSize: 18),
-        ),
-        backgroundColor: Colors.purple,
-        elevation: 2,
+        title: Text('Luvvy'),
+        centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatPage(userEmail: widget.userEmail),
-                ),
+            icon: Icon(Icons.group),
+            onPressed: (){
+              Navigator.push(context,MaterialPageRoute(
+                  builder: (_) => InterestsPage(userEmail: widget.userEmail))
               );
             },
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Icon(Icons.person, color: Colors.purple.shade700),
+        ],
+      ),
+      body: filteredRecommendations.isEmpty
+          ? Center(child: Text("No more recommendations"))
+          : SwipableStack(
+        controller: _swipeController,
+        itemCount: filteredRecommendations.length,
+        builder: (context, properties) {
+          final profile = filteredRecommendations[properties.index];
+          return Card(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 64,
+                  backgroundImage: NetworkImage(profile['profileImage'] ?? 'https://via.placeholder.com/150'),
+                ),
+                Text(profile['nickname'] ?? 'Someone', style: TextStyle(fontSize: 20)),
+                Text(profile['about'] ?? '', textAlign: TextAlign.center),
+              ],
             ),
-          )
-        ],
+          );
+        },
+        onSwipeCompleted: (index, direction) {
+          final user = filteredRecommendations[index];
+          final email = user['email'];
+          if (direction == SwipeDirection.right && email != null) {
+            likedUserEmails.add(email);
+            _socket.likeUser(email);
+            setState(() {});
+          }
+        },
       ),
-
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        child: pages[_currentIndex],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        selectedItemColor: Colors.purple,
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
-        type: BottomNavigationBarType.fixed,
-        onTap: (index) => setState(() => _currentIndex = index),
-        items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined), label: 'Home'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.favorite_outline), label: 'Interests'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline), label: 'Profile'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined), label: 'Settings'),
-        ],
-      ),
+      floatingActionButton: pendingLikes.isNotEmpty
+          ? FloatingActionButton(
+        backgroundColor: Colors.purple,
+        onPressed: () => _showLikeNotification(pendingLikes.last['from']),
+        child: Icon(Icons.favorite),
+      )
+          : null,
     );
   }
 }
