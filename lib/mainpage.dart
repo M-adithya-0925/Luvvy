@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:swipable_stack/swipable_stack.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'services/socket_service.dart';
 import 'chat.dart';
+import 'detailed_chat_screen.dart';
 import 'interestspage.dart';
 import 'terms_conditions.dart';
 import 'dart:math' as math;
@@ -25,13 +28,17 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   final SocketService _socket = SocketService.instance;
   SwipableStackController _swipeController = SwipableStackController();
 
+  // Backend configuration
+  final String backendUrl = 'http://192.168.1.27:5000';
+
   Set<String> likedEmails = {};
   Set<String> matchedEmails = {};
   List<Map<String, dynamic>> pendingLikes = [];
   List<dynamic> filteredRecommendations = [];
   bool _isLoadingInteractions = true;
+  bool _isBackendConnected = false;
 
-  // ✅ FIXED: Make animations nullable
+  // Animations
   AnimationController? _fadeController;
   AnimationController? _buttonController;
   Animation<double>? _fadeAnimation;
@@ -41,9 +48,17 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
-    // ✅ FIXED: Initialize animations immediately
+    print('🚀 MainPage initialized for user: ${widget.userEmail}');
+    print('📊 Total recommendations: ${widget.recommendations.length}');
+
+    // Initialize animations
     _initializeAnimations();
-    _socket.connect(widget.userEmail);
+
+    // Test backend connectivity first
+    _testBackendConnectivity();
+
+    // Connect to Socket.IO
+    _setupSocketConnection();
 
     // Load existing interactions
     _loadUserInteractions().then((_) {
@@ -53,32 +68,219 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
         _buttonController?.forward();
       });
     });
+  }
+
+  // ===========================
+  // BACKEND CONNECTIVITY
+  // ===========================
+
+  Future<void> _testBackendConnectivity() async {
+    print('🔍 Testing backend connectivity...');
+    try {
+      final response = await http.get(
+        Uri.parse('$backendUrl/health'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        print('✅ Backend reachable via HTTP: ${response.body}');
+        setState(() => _isBackendConnected = true);
+      } else {
+        print('❌ Backend HTTP error: ${response.statusCode}');
+        setState(() => _isBackendConnected = false);
+      }
+    } catch (e) {
+      print('❌ Backend connectivity test failed: $e');
+      setState(() => _isBackendConnected = false);
+      if (mounted) {
+        _showErrorSnackBar('⚠️ Cannot reach server. Using offline mode.');
+      }
+    }
+  }
+
+  void _setupSocketConnection() {
+    _socket.connect(widget.userEmail);
+
+    // Connection status monitoring
+    _socket.onConnectionChanged = (isConnected) {
+      print(isConnected ? '🟢 MainPage: Connected to backend' : '🔴 MainPage: Disconnected from backend');
+      setState(() => _isBackendConnected = isConnected);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  isConnected ? Icons.wifi : Icons.wifi_off,
+                  color: Colors.white,
+                ),
+                SizedBox(width: 12),
+                Text(isConnected ? '🟢 Connected to server' : '🔴 Connection lost'),
+              ],
+            ),
+            backgroundColor: isConnected ? Colors.green : Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    };
 
     // Socket listeners
     _socket.onLikeReceived = (data) {
+      print('💖 MainPage received like: $data');
       final fromUser = data['from'] as String;
       if (!pendingLikes.any((e) => e['from'] == fromUser)) {
-        setState(() => pendingLikes.add({'from': fromUser}));
+        setState(() => pendingLikes.add({'from': fromUser, 'data': data}));
       }
-      _showLikeReceivedDialog(fromUser);
+      _showLikeReceivedDialog(fromUser, data);
     };
 
     _socket.onMatchCreated = (data) {
+      print('🎉 MainPage received match: $data');
       final matchedUser = data['with'] as String;
       setState(() {
         matchedEmails.add(matchedUser);
         likedEmails.add(matchedUser);
       });
       _filterRecommendations();
-      _showTermsAndConditions(matchedUser);
+      _showMatchDialog(matchedUser, data);
     };
 
     _socket.onError = (msg) {
+      print('❌ MainPage socket error: $msg');
       _showErrorSnackBar(msg);
     };
   }
 
-  // ✅ FIXED: Separate animation initialization
+  // ===========================
+  // LIKE FUNCTIONALITY
+  // ===========================
+
+  Future<void> _likeUser(String likedUserEmail) async {
+    print('👍 Attempting to like user: $likedUserEmail');
+
+    // Add to local liked list immediately for UI responsiveness
+    setState(() {
+      likedEmails.add(likedUserEmail);
+    });
+
+    try {
+      // Method 1: Try Socket.IO first (real-time)
+      if (_socket.isConnected) {
+        _socket.likeUser(likedUserEmail, matchScore: 85.0);
+        print('📡 Like sent via Socket.IO');
+        _showSuccessSnackBar('Like sent! 💖');
+      } else {
+        // Method 2: Fallback to HTTP API
+        await _likeUserViaHTTP(likedUserEmail);
+      }
+    } catch (e) {
+      print('❌ Error liking user: $e');
+      _showErrorSnackBar('Failed to send like. Try again.');
+    }
+  }
+
+  Future<void> _likeUserViaHTTP(String likedUserEmail) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$backendUrl/like'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'liker_email': widget.userEmail,
+          'liked_email': likedUserEmail,
+          'match_score': 85.0,
+        }),
+      ).timeout(Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('✅ HTTP like successful: $data');
+        _showSuccessSnackBar('Like sent! 💖');
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ HTTP like failed: $e');
+      _showErrorSnackBar('Failed to send like via HTTP');
+    }
+  }
+
+  void _acceptLike(String fromUserEmail) {
+    print('✅ Accepting like from: $fromUserEmail');
+
+    if (_socket.isConnected) {
+      _socket.acceptLike(fromUserEmail);
+    } else {
+      _acceptLikeViaHTTP(fromUserEmail);
+    }
+  }
+
+  Future<void> _acceptLikeViaHTTP(String fromUserEmail) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$backendUrl/accept_like'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'accepter_email': widget.userEmail,
+          'original_liker_email': fromUserEmail,
+        }),
+      ).timeout(Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('✅ HTTP accept like successful: $data');
+
+        if (data['mutual_match'] == true) {
+          setState(() {
+            matchedEmails.add(fromUserEmail);
+            likedEmails.add(fromUserEmail);
+          });
+          _filterRecommendations();
+          _showMatchDialog(fromUserEmail, {
+            'matchId': data['match_id'],
+            'chatId': data['match_id']?.replaceAll('match_', 'chat_')
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error accepting like via HTTP: $e');
+    }
+  }
+
+  void _rejectLike(String fromUserEmail) {
+    print('❌ Rejecting like from: $fromUserEmail');
+
+    if (_socket.isConnected) {
+      _socket.rejectLike(fromUserEmail);
+    } else {
+      _rejectLikeViaHTTP(fromUserEmail);
+    }
+  }
+
+  Future<void> _rejectLikeViaHTTP(String fromUserEmail) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$backendUrl/reject_like'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'rejector_email': widget.userEmail,
+          'original_liker_email': fromUserEmail,
+        }),
+      ).timeout(Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        print('✅ HTTP reject like successful');
+      }
+    } catch (e) {
+      print('❌ Error rejecting like via HTTP: $e');
+    }
+  }
+
+  // ===========================
+  // ANIMATIONS
+  // ===========================
+
   void _initializeAnimations() {
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -96,6 +298,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       CurvedAnimation(parent: _buttonController!, curve: Curves.elasticOut),
     );
   }
+
+  // ===========================
+  // DATA LOADING
+  // ===========================
 
   Future<void> _loadUserInteractions() async {
     final user = widget.userEmail;
@@ -143,7 +349,11 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     });
   }
 
-  void _showLikeReceivedDialog(String from) {
+  // ===========================
+  // UI DIALOGS
+  // ===========================
+
+  void _showLikeReceivedDialog(String from, Map<String, dynamic> data) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -165,139 +375,283 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-            // Animated heart
-            TweenAnimationBuilder<double>(
-            duration: const Duration(milliseconds: 1200),
-            tween: Tween(begin: 0.0, end: 1.0),
-            builder: (context, value, child) {
-              return Transform.scale(
-                scale: value,
-                child: Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.pink.shade400, Colors.red.shade500],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.pink.withOpacity(0.4),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Animated heart
+                TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 1200),
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  builder: (context, value, child) {
+                    return Transform.scale(
+                      scale: value,
+                      child: Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.pink.shade400, Colors.red.shade500],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.pink.withOpacity(0.4),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.favorite, size: 45, color: Colors.white),
                       ),
-                    ],
-                  ),
-                  child: const Icon(Icons.favorite, size: 45, color: Colors.white),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
-          const SizedBox(height: 28),
-          const Text(
-            "💖 Someone likes you!",
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '$from thinks youre amazing! Like them back to create a match.',
-            style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey.shade600,
-            height: 1.5,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 36),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () {
-                  _socket.rejectLike(from);
-                  Navigator.pop(context);
-                  setState(() {
-                    pendingLikes.removeWhere((element) => element['from'] == from);
-                  });
-                },
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: Colors.grey.shade400, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                ),
-                child: Text(
-                  'Not Now',
+                const SizedBox(height: 28),
+                const Text(
+                  "💖 Someone likes you!",
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () {
-                  _socket.acceptLike(from);
-                  Navigator.pop(context);
-                  setState(() {
-                    pendingLikes.removeWhere((element) => element['from'] == from);
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.pink.shade400,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  elevation: 3,
-                ),
-                child: const Text(
-                  'Like Back ❤️',
-                  style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                Text(
+                  '${data['fromData']?['nickname'] ?? from} thinks you\'re amazing! Like them back to create a match.',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 36),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _rejectLike(from);
+                          setState(() {
+                            pendingLikes.removeWhere((element) => element['from'] == from);
+                          });
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade400, width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                        ),
+                        child: Text(
+                          'Not Now',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _acceptLike(from);
+                          setState(() {
+                            pendingLikes.removeWhere((element) => element['from'] == from);
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.pink.shade400,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          elevation: 3,
+                        ),
+                        child: const Text(
+                          'Like Back ❤️',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-        ],
       ),
-    ),
-    ),
-    ),
     );
   }
 
-  void _showTermsAndConditions(String matchedUser) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TermsConditionsScreen(
-          onAccept: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChatPage(
-                userEmail: widget.userEmail,
-                otherUserEmail: matchedUser,
+  void _showMatchDialog(String matchedUser, Map<String, dynamic> data) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          margin: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.pink.shade400, Colors.purple.shade500],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 30,
+                offset: const Offset(0, 15),
               ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Match animation
+                TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 1500),
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  builder: (context, value, child) {
+                    return Transform.scale(
+                      scale: value,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.5),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.favorite,
+                          size: 50,
+                          color: Colors.pink,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 28),
+                const Text(
+                  "🎉 It's a Match!",
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'You and $matchedUser liked each other!',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.white.withOpacity(0.9),
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 36),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.white, width: 2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                        ),
+                        child: const Text(
+                          'Keep Swiping',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          // Navigate to chat
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DetailedChatScreen(
+                                currentUserEmail: widget.userEmail,
+                                otherUserEmail: matchedUser,
+                                chatId: data['chatId'] ?? 'chat_${widget.userEmail}_$matchedUser',
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.pink.shade400,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          elevation: 3,
+                        ),
+                        child: const Text(
+                          'Start Chat 💬',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -319,6 +673,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       ),
     );
   }
+
+  // ===========================
+  // PROFILE CARD BUILDER
+  // ===========================
 
   Widget _buildProfileCard(Map<String, dynamic> profile, int index) {
     final name = profile['nickname'] ?? profile['name'] ?? 'Someone Special';
@@ -415,31 +773,35 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
               ),
             ),
 
-            // Online Status
+            // Connection Status Badge
             Positioned(
               top: 24,
               left: 24,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade500,
+                  color: _isBackendConnected ? Colors.green.shade500 : Colors.orange.shade500,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.green.withOpacity(0.3),
+                      color: (_isBackendConnected ? Colors.green : Colors.orange).withOpacity(0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.circle, color: Colors.white, size: 10),
-                    SizedBox(width: 6),
+                    Icon(
+                      _isBackendConnected ? Icons.wifi : Icons.wifi_off,
+                      color: Colors.white,
+                      size: 10,
+                    ),
+                    const SizedBox(width: 6),
                     Text(
-                      "Online",
-                      style: TextStyle(
+                      _isBackendConnected ? "Online" : "Offline",
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -621,6 +983,10 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
     );
   }
 
+  // ===========================
+  // MAIN BUILD METHOD
+  // ===========================
+
   @override
   Widget build(BuildContext context) {
     if (_isLoadingInteractions) {
@@ -630,8 +996,8 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation(Colors.pink),
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation(Colors.pink.shade400),
                 strokeWidth: 3,
               ),
               const SizedBox(height: 24),
@@ -641,6 +1007,37 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                   fontSize: 18,
                   color: Colors.grey.shade600,
                   fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Connection status
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _isBackendConnected ? Colors.green.shade50 : Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _isBackendConnected ? Colors.green.shade300 : Colors.orange.shade300,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isBackendConnected ? Icons.wifi : Icons.wifi_off,
+                      color: _isBackendConnected ? Colors.green.shade600 : Colors.orange.shade600,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _isBackendConnected ? 'Connected to server' : 'Connecting to server...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _isBackendConnected ? Colors.green.shade700 : Colors.orange.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -678,6 +1075,22 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                   color: Colors.grey.shade500,
                 ),
               ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () {
+                  _loadUserInteractions().then((_) => _filterRecommendations());
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Refresh'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pink.shade400,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -688,7 +1101,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
         child: _fadeAnimation == null
-            ? const Center(child: CircularProgressIndicator()) // ✅ FIXED: Show loading while animations initialize
+            ? const Center(child: CircularProgressIndicator())
             : FadeTransition(
           opacity: _fadeAnimation!,
           child: Column(
@@ -725,6 +1138,16 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                     ),
                     Row(
                       children: [
+                        // Connection status indicator
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: _isBackendConnected ? Colors.green : Colors.orange,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Container(
                           width: 50,
                           height: 50,
@@ -795,7 +1218,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                           ),
                           child: IconButton(
                             icon: const Icon(Icons.chat_bubble, color: Colors.purple),
-                            onPressed: () {},
+                            onPressed: () {
+                              // Navigate to matches/chats page
+                            },
                           ),
                         ),
                       ],
@@ -839,6 +1264,11 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _isBackendConnected ? '🟢' : '🟠',
+                      style: const TextStyle(fontSize: 16),
+                    ),
                   ],
                 ),
               ),
@@ -855,10 +1285,14 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                   onSwipeCompleted: (index, direction) {
                     final user = filteredRecommendations[index];
                     final email = (user['email'] ?? '').toString().toLowerCase();
+
                     if (direction == SwipeDirection.right && email.isNotEmpty) {
-                      likedEmails.add(email);
-                      _socket.likeUser(email);
+                      print('👍 Swiped right on: $email');
+                      _likeUser(email);
                       _filterRecommendations();
+                    } else if (direction == SwipeDirection.left) {
+                      print('👎 Swiped left on: $email');
+                      // Could add "pass" functionality here
                     }
                   },
                 ),
@@ -866,7 +1300,7 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
 
               // Action Buttons
               _buttonAnimation == null
-                  ? Container() // ✅ FIXED: Show empty container while button animation initializes
+                  ? Container()
                   : AnimatedBuilder(
                 animation: _buttonAnimation!,
                 builder: (context, child) {
@@ -883,7 +1317,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                             backgroundColor: Colors.white,
                             label: "Nope",
                             onPressed: () {
-                              _swipeController.next(swipeDirection: SwipeDirection.left);
+                              if (filteredRecommendations.isNotEmpty) {
+                                _swipeController.next(swipeDirection: SwipeDirection.left);
+                              }
                             },
                           ),
                           _buildActionButton(
@@ -893,7 +1329,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                             label: "Super",
                             size: 78,
                             onPressed: () {
-                              _swipeController.next(swipeDirection: SwipeDirection.up);
+                              if (filteredRecommendations.isNotEmpty) {
+                                _swipeController.next(swipeDirection: SwipeDirection.up);
+                              }
                             },
                           ),
                           _buildActionButton(
@@ -902,7 +1340,9 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
                             backgroundColor: Colors.white,
                             label: "Like",
                             onPressed: () {
-                              _swipeController.next(swipeDirection: SwipeDirection.right);
+                              if (filteredRecommendations.isNotEmpty) {
+                                _swipeController.next(swipeDirection: SwipeDirection.right);
+                              }
                             },
                           ),
                         ],
