@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class MatchService {
-  static const String baseUrl = 'http://192.168.1.48:5000';
+  static const String baseUrl = 'http://192.168.1.27:5000';
 
   static Future<List<Map<String, dynamic>>> getRecommendations(String email) async {
     try {
