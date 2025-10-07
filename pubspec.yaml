@@ -45,6 +45,9 @@ dependencies:
   swipable_stack: ^2.0.0
   http: ^0.13.6
   socket_io_client: ^2.0.3+1  # Add this line
+  sign_in_with_apple: ^6.1.0
+  flutter_facebook_auth: ^6.0.4
+  shared_preferences: ^2.2.2
 
 
 dev_dependencies:
